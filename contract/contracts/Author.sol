@@ -7,10 +7,10 @@ import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 contract Author is Ownable {
     using SafeMath for uint256;
 
-    uint public totalFee = 0.00001 ether;
-    uint public minimumRange = 1;
-    uint public maximumRange = 5;
-    uint public totalRange = 10;
+    uint public initialAuthorFee = 0.00001 ether;
+    // uint public minimumRange = 1;
+    // uint public maximumRange = 5;
+    // uint public totalRange = 10;
 
     mapping(uint => address payable) public tokenToAuthor;
     mapping(uint => uint) public paymentToAuthor;
@@ -21,33 +21,33 @@ contract Author is Ownable {
     }
 
     /* setting functions */
-    function changeTotalFee(uint _totalFee) public onlyOwner returns (bool){
-        require(0.01 ether >= _totalFee);
-        totalFee = _totalFee;
+    function changeAuthorFee(uint _tokenId, uint _authorFee) public onlyTokenAuthor(_tokenId) returns (bool){
+        require(0.01 ether >= _authorFee);
+        paymentToAuthor[_tokenId] = _authorFee;
         return true;
     }
 
-    function changeMinimumRange(uint _minimumRange) public onlyOwner returns (bool){
-        require(0 <=_minimumRange);
-        minimumRange = _minimumRange;
-        return true;
-    }
+    // function changeMinimumRange(uint _minimumRange) public onlyOwner returns (bool){
+    //     require(0 <=_minimumRange);
+    //     minimumRange = _minimumRange;
+    //     return true;
+    // }
 
-    function changeMaximumRange(uint _maximumRange) public onlyOwner returns (bool){
-        require(10 >= _maximumRange);
-        maximumRange = _maximumRange;
-        return true;
-    }
+    // function changeMaximumRange(uint _maximumRange) public onlyOwner returns (bool){
+    //     require(10 >= _maximumRange);
+    //     maximumRange = _maximumRange;
+    //     return true;
+    // }
 
-    function changeRangePaymentToAuthor(uint _tokenId, uint _paymentToAuthor) public onlyTokenAuthor(_tokenId) returns (bool){
-        require(minimumRange <= _paymentToAuthor && _paymentToAuthor <= maximumRange);
-        paymentToAuthor[_tokenId] = _paymentToAuthor;
-        return true;
-    }
+    // function changeRangePaymentToAuthor(uint _tokenId, uint _paymentToAuthor) public onlyTokenAuthor(_tokenId) returns (bool){
+    //     require(minimumRange <= _paymentToAuthor && _paymentToAuthor <= maximumRange);
+    //     paymentToAuthor[_tokenId] = _paymentToAuthor;
+    //     return true;
+    // }
 
     function settingOfAuthorFee(uint _tokenId) internal returns (bool){
         tokenToAuthor[_tokenId] = msg.sender;
-        paymentToAuthor[_tokenId] = maximumRange;
+        paymentToAuthor[_tokenId] = initialAuthorFee;
         return true;
     }
     /* payment functions */
@@ -60,9 +60,8 @@ contract Author is Ownable {
     // }
 
     function paymentOnlyAuthorFee(uint _tokenId) public payable returns (bool){
-        uint _authorFee = totalFee.mul(paymentToAuthor[_tokenId]).div(10);
-        require(msg.value == _authorFee);
-        tokenToAuthor[_tokenId].transfer(_authorFee);
+        require(msg.value == paymentToAuthor[_tokenId]);
+        tokenToAuthor[_tokenId].transfer(paymentToAuthor[_tokenId]);
         return true;
     }
 }
