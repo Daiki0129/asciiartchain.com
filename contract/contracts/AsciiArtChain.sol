@@ -1,43 +1,56 @@
 pragma solidity ^0.5.10;
-//関数の実行の最後につけていく
+
 import "./SafeMath.sol";
-import "./Author.sol";
+import "./Ownable.sol";
 import "./ERC721Full.sol";
 import "./ERC721Holder.sol";
+import "./ERC721Pausable.sol";
 
-// import "./author_contracts/ownership/Ownable.sol";
+contract AsciiArtChain is Ownable, ERC721Full, ERC721Holder, ERC721Pausable {
+    using SafeMath for uint;
 
-contract AsciiArtChain is ERC721Full, ERC721Holder {
-    using SafeMath for uint128;
-    
+	string public constant ASCIIARTCHAIN_AUTHOR = "Daiki Kunii";
+    uint public createAsciiArtFee = 0.002 ether;
+    uint internal nextTokenId = 1;
+    uint internal addNumber = 1;
     address payable public recipientOwner;
+    string public tokenURIPrefix = "https://www.asciiartchain.net/metadata/";
+
     constructor () ERC721Full("AsciiArtChain" ,"ART") public {
     }
 
-    uint public createAsciiArtFee = 0.002 ether;
-    uint internal nextTokenId = 1000000000000;
-    string public tokenURIPrefix = "https://www.asciiartchain.net/metadata/";
-    
-    // string public asciiArt;
+    event MintAsciiArt(
+        bytes32 hash,
+        string art,
+        string authorName,
+        address authorAddress,
+        uint tokenId
+    );
 
-    // function setAsciiArt(string calldata _asciiArt) external {
-    //     asciiArt = _asciiArt;
-    // }
-    // uint16 public constant ASCIIART_TYPE_OFFSET = 10000;
+    struct ArtDetails {
+        string art;
+        string authorName;
+        address authorAddress;
+        bytes32 artHash;
+        uint timestamp;
+    }
+
+    mapping (bytes32 => bool) public mintedAsciiArt;
+    mapping (uint => ArtDetails) public asciiArt;
 
     function setRecipientOwner(address payable _recipientOwner) external onlyOwner {
         recipientOwner = _recipientOwner;
     }
-    
+
     function setTokenURIPrefix(string calldata _tokenURIPrefix) external onlyOwner {
         tokenURIPrefix = _tokenURIPrefix;
     }
-    
+
     function setCreateAsciiArtFee(uint _createAsciiArtFee) external onlyOwner {
         createAsciiArtFee = _createAsciiArtFee;
     }
 
-    function tokenURI(uint tokenId) external view returns (string memory) {
+    function tokenURI(uint tokenId) public view returns (string memory) {
         bytes32 tokenIdBytes;
         if (tokenId == 0) {
             tokenIdBytes = "0";
@@ -55,40 +68,48 @@ contract AsciiArtChain is ERC721Full, ERC721Holder {
 
         uint8 i;
         uint8 index = 0;
-        
+
         for (i = 0; i < prefixBytes.length; i++) {
             tokenURIBytes[index] = prefixBytes[i];
             index++;
         }
-        
+
         for (i = 0; i < tokenIdBytes.length; i++) {
             tokenURIBytes[index] = tokenIdBytes[i];
             index++;
         }
-        
+
         return string(tokenURIBytes);
     }
-    
-    function transferFrom(address from, address to, uint tokenId) public payable{
-      //solhint-disable-next-line max-line-length
-      require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: transfer caller is not owner nor approved");
-      super._transferFrom(from, to, tokenId);
-    //   require(paymentOnlyAuthorFee(tokenId), "ERC721: Failure transfer of Author fee");
-    }
-//string calldata _message
-    function mintAsciiArt() external payable {
-      require(msg.value == createAsciiArtFee);
+
+    function mintAsciiArt(string calldata _art, string calldata _authorName) external payable {
+      require(msg.value == createAsciiArtFee, "mintAsciiArt: Insufficient payment");
+
+      bytes32 hash = createArtHash(_art);
+
+      require(!mintedAsciiArt[hash], "mintAsciiArt: This AsciiArt has already been issued");
+
       uint _tokenId = nextTokenId;
-      nextTokenId = nextTokenId.add(1);
-      super._mint(msg.sender, _tokenId);
-    //   super._setTokenURI(_tokenId, _message);
-    //   recipientOwner.transfer(createAsciiArtFee);
+      nextTokenId = nextTokenId.add(addNumber);
+      asciiArt[_tokenId] = ArtDetails(_art, _authorName, msg.sender, hash, now);
+      mintedAsciiArt[hash] = true;
+	    super._mint(msg.sender, _tokenId);
+      recipientOwner.transfer(createAsciiArtFee);
+      emit MintAsciiArt(hash, _art, _authorName, msg.sender, _tokenId);
     }
 
-    function burnAsciiArt(uint tokenId) external payable {
-      //solhint-disable-next-line max-line-length
+    function burnAsciiArt(uint tokenId) external {
+      require(asciiArt[tokenId].authorAddress == msg.sender, "ERC721Burnable: burn can only be author");
       require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721Burnable: caller is not owner nor approved");
       super._burn(tokenId);
-    //   require(paymentOnlyAuthorFee(tokenId), "ERC721: Failure transfer of Author fee");
     }
+
+	function createArtHash(string memory _art) public pure returns(bytes32){
+			return keccak256(
+				abi.encodePacked(
+					_art
+				)
+			);
+    }
+
 }
